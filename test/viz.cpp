@@ -108,18 +108,22 @@ public:
     static std::unique_ptr<DrawablePolygon> makeDrawable(std::size_t index, mapbox::fixtures::FixtureTester* fixture);
     DrawablePolygon() = default;
     virtual ~DrawablePolygon() = default;
-    virtual const char* name() = 0;
+    virtual const char *name() = 0;
     virtual void drawMesh() = 0;
     virtual void drawOutline() = 0;
     virtual void drawFill() = 0;
 };
 
+template <typename Tesselator>
 class DrawableTesselator : public DrawablePolygon {
-    mapbox::fixtures::FixtureTester::TesselatorResult shape;
-    mapbox::fixtures::DoublePolygon const& polygon;
+    mapbox::fixtures::DoublePolygon polygon;
+    Tesselator tesselator;
+    typename Tesselator::Result shape;
+
 public:
-    explicit DrawableTesselator(mapbox::fixtures::FixtureTester::TesselatorResult tessellation,
-                                mapbox::fixtures::DoublePolygon const& poly) : shape(tessellation), polygon(poly) { }
+    explicit DrawableTesselator(mapbox::fixtures::FixtureTester *fixture)
+        : polygon(fixture->getPolygon()), tesselator(polygon), shape(tesselator.run()) {
+    }
     void drawMesh() override {
         const auto &v = shape.vertices;
         const auto &x = shape.indices;
@@ -159,22 +163,27 @@ public:
         }
         glEnd();
     }
+    const char *name() override {
+        //return typeid(Tesselator).name();
+        return tesselator.name();
+    }
 };
 
+/*
 class DrawableEarcut : public DrawableTesselator {
 public:
     explicit DrawableEarcut(mapbox::fixtures::FixtureTester* fixture)
-            : DrawableTesselator(fixture->earcut(), fixture->polygon()) { }
+            : DrawableTesselator(fixture->earcut(), fixture->getPolygon()) { }
     const char *name() override { return "earcut"; };
 };
 
 class DrawableLibtess : public DrawableTesselator {
 public:
     explicit DrawableLibtess(mapbox::fixtures::FixtureTester* fixture)
-            : DrawableTesselator(fixture->libtess(), fixture->polygon()) { }
+            : DrawableTesselator(fixture->libtess(), fixture->getPolygon()) { }
     const char *name() override { return "libtess2"; };
 };
-
+*/
 class DrawableScanLineFill : public DrawablePolygon {
     struct Edge {
         float yMin;
@@ -200,9 +209,9 @@ class DrawableScanLineFill : public DrawablePolygon {
     mapbox::fixtures::FixtureTester* shape;
     std::vector<Edge*> activeList; /* contains current sorted intersections */
     std::vector<std::vector<Edge>> edgeTables; /* contains all edges sorted by yMin */
+    mapbox::fixtures::DoublePolygon polygon;
 public:
-    explicit DrawableScanLineFill(mapbox::fixtures::FixtureTester* fixture) : shape(fixture) {
-        auto& polygon = shape->polygon();
+    explicit DrawableScanLineFill(mapbox::fixtures::FixtureTester* fixture) : shape(fixture), polygon(fixture->getPolygon()) {
         edgeTables.reserve(polygon.size());
         for (const auto &ring : polygon) {
             std::vector<Edge> edgeTable;
@@ -295,7 +304,6 @@ public:
         }
     }
     void drawOutline() override {
-        auto& polygon = shape->polygon();
         glBegin(GL_LINES);
         for (std::size_t i = 0; i < polygon.size(); i++) {
             auto& ring = polygon[i];
@@ -313,11 +321,16 @@ public:
     const char *name() override { return "scanline-fill"; }
 };
 
-std::unique_ptr<DrawablePolygon> DrawablePolygon::makeDrawable(std::size_t index, mapbox::fixtures::FixtureTester* fixture) {
+std::unique_ptr<DrawablePolygon>
+DrawablePolygon::makeDrawable(std::size_t index, mapbox::fixtures::FixtureTester *fixture) {
     if (index == 0) {
-        return std::unique_ptr<DrawablePolygon>(new DrawableEarcut(fixture));
+        return std::unique_ptr<DrawablePolygon>(
+            new DrawableTesselator<EarcutTesselator<double, mapbox::fixtures::DoublePolygon>>(
+                fixture));
     } else if (index == 1) {
-        return std::unique_ptr<DrawablePolygon>(new DrawableLibtess(fixture));
+        return std::unique_ptr<DrawablePolygon>(
+            new DrawableTesselator<Libtess2Tesselator<double, mapbox::fixtures::DoublePolygon>>(
+                fixture));
     } else {
         return std::unique_ptr<DrawablePolygon>(new DrawableScanLineFill(fixture));
     }
@@ -442,7 +455,7 @@ int main() {
                 tessellator.reset(nullptr);
             }
 
-            const auto& polygon = getFixture(shapeIndex)->polygon();
+            const auto polygon = getFixture(shapeIndex)->getPolygon();
             auto minX = std::numeric_limits<double>::max();
             auto maxX = std::numeric_limits<double>::min();
             auto minY = std::numeric_limits<double>::max();

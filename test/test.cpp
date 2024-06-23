@@ -1,5 +1,7 @@
 #include "tap.hpp"
 #include "fixtures/geometries.hpp"
+#include "comparison/earcut.hpp"
+#include "comparison/libtess2.hpp"
 
 #include <iomanip>
 #include <locale>
@@ -57,11 +59,13 @@ std::string formatPercent(double num) {
 void areaTest(mapbox::fixtures::FixtureTester* fixture) {
     Tap::Test t(fixture->name);
 
-    const auto expectedArea = polygonArea(fixture->polygon());
+    auto const polygon = fixture->getPolygon();
+    const auto expectedArea = polygonArea(polygon);
     const auto expectedTriangles = fixture->expectedTriangles;
 
     { // Earcut
-        const auto earcut = fixture->earcut();
+        EarcutTesselator<double, mapbox::fixtures::DoublePolygon> earcutTesselator{polygon};
+        const auto earcut = earcutTesselator.run();;
 
         const auto earcutTriangles = earcut.indices.size() / 3;
         t.ok(earcutTriangles == expectedTriangles, std::to_string(earcutTriangles) + " triangles when expected " +
@@ -81,7 +85,8 @@ void areaTest(mapbox::fixtures::FixtureTester* fixture) {
     }
 
     { // Libtess2
-        const auto libtess = fixture->libtess();
+        Libtess2Tesselator<double, mapbox::fixtures::DoublePolygon> libtessTesselator{polygon};   
+        const auto libtess = libtessTesselator.run();
         const auto area = trianglesArea(libtess.vertices, libtess.indices);
         const double deviation = (expectedArea == area) ? 0 :
                 expectedArea == 0 ? std::numeric_limits<double>::infinity() :

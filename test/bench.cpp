@@ -1,5 +1,8 @@
 #include "fixtures/geometries.hpp"
 
+#include "comparison/earcut.hpp"
+#include "comparison/libtess2.hpp"
+
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -30,9 +33,10 @@ void report(mapbox::fixtures::FixtureTester* fixture, const int cols[]) {
     const char filling = std::cerr.fill();
     std::cerr << std::setfill(' ');
     std::cerr << "| " << std::left << std::setw(cols[0]) << fixture->name << " | ";
-    auto earcut = bench([&]{ fixture->earcut(); });
+    auto polygon = fixture->getPolygon();
+    auto earcut = bench([&]{ EarcutTesselator<double, mapbox::fixtures::DoublePolygon> earcutTesselator{polygon}; earcutTesselator.run(); });
     std::cerr << std::right << std::setw(cols[1] - 6) << std::fixed << std::setprecision(0) << earcut << " ops/s | ";
-    auto libtess2 = bench([&]{ fixture->libtess(); });
+    auto libtess2 = bench([&]{ Libtess2Tesselator<double, mapbox::fixtures::DoublePolygon> libtessTesselator{polygon}; libtessTesselator.run(); });
     std::cerr << std::setw(cols[2] - 6) << std::setprecision(0) << libtess2 << " ops/s |" << std::endl;
     std::cerr << std::setfill(filling);
     std::cerr.flags(flags);

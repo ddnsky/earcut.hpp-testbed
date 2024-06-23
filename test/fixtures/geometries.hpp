@@ -9,16 +9,12 @@
 #include <iostream>
 #include <algorithm>
 #include <type_traits>
-
-#include "../comparison/earcut.hpp"
-#include "../comparison/libtess2.hpp"
+#include <limits>
 
 namespace mapbox {
 namespace fixtures {
 template <typename T> using Polygon = std::vector<std::vector<T>>;
-template <typename T> using Triangles = std::vector<T>;
 using DoublePoint = std::pair<double, double>;
-using DoubleTriangles = Triangles<DoublePoint>;
 using DoublePolygon = Polygon<DoublePoint>;
 const double Infinity = std::numeric_limits<double>::infinity();
 
@@ -42,10 +38,6 @@ public:
 
 class FixtureTester {
 public:
-    struct TesselatorResult {
-        std::vector<std::array<double, 2>> const& vertices;
-        std::vector<uint32_t> const& indices;
-    };
     const std::string name;
     const std::size_t expectedTriangles;
     const double expectedEarcutDeviation;
@@ -57,9 +49,7 @@ public:
     virtual ~FixtureTester() {
         Collector<FixtureTester*>::remove(this);
     }
-    virtual TesselatorResult earcut() = 0;
-    virtual TesselatorResult libtess() = 0;
-    virtual DoublePolygon const& polygon() = 0;
+    virtual DoublePolygon getPolygon() = 0;
     static std::vector<FixtureTester*>& collection() {
         auto& objects = Collector<FixtureTester*>::collection();
         std::sort(objects.begin(), objects.end(), [](FixtureTester* a, FixtureTester* b) { return a->name < b->name; });
@@ -71,14 +61,15 @@ template <class T>
 class Fixture : public FixtureTester {
 private:
     Polygon<std::pair<T, T>> inputPolygon;
-    DoublePolygon doublePolygon;
-    EarcutTesselator<double, Polygon<std::pair<T, T>>> earcutTesselator;
-    Libtess2Tesselator<double, Polygon<std::pair<T, T>>> libtessTesselator;
 public:
     Fixture<T>(std::string const& name, std::size_t expectedTriangles,
         double expectedDeviation, double expectedLibtessDeviation, Polygon<std::pair<T, T>> const& p)
-        : FixtureTester(name, expectedTriangles, expectedDeviation, expectedLibtessDeviation),
-          inputPolygon(p), earcutTesselator(inputPolygon), libtessTesselator(inputPolygon) {
+        : FixtureTester(name, expectedTriangles, expectedDeviation, expectedLibtessDeviation)
+        , inputPolygon(p)
+    {
+    }
+    DoublePolygon getPolygon() override final {
+        DoublePolygon doublePolygon; 
         doublePolygon.reserve(inputPolygon.size());
         for (auto& ring : inputPolygon) {
             std::vector<std::pair<double, double>> r;
@@ -88,16 +79,6 @@ public:
             }
             doublePolygon.push_back(r);
         }
-    }
-    TesselatorResult earcut() override {
-        earcutTesselator.run();
-        return { earcutTesselator.vertices(), earcutTesselator.indices() };
-    }
-    TesselatorResult libtess() override {
-        libtessTesselator.run();
-        return { libtessTesselator.vertices(), libtessTesselator.indices() };
-    }
-    DoublePolygon const& polygon() override {
         return doublePolygon;
     }
 };

@@ -35,7 +35,12 @@ public:
         }
     }
 
-    void run() {
+    struct Result {
+        Vertices const& vertices;
+        Indices const& indices;
+    };
+
+    Result run() {
         dirty = true;
 
         // Add polygon data
@@ -51,6 +56,7 @@ public:
             assert(false && "tesselation failed");
 #endif
         }
+        return {vertices(), indices()};
     }
 
     auto indices() -> const Indices & {
@@ -86,6 +92,11 @@ public:
 
         return vertexData;
     }
+
+    const char *name() { 
+        return "libtess2"; 
+    }
+
 
 private:
     static const int vertexSize = 2;
