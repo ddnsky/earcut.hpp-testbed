@@ -1,5 +1,6 @@
 #pragma once
-#include <mapbox/earcut.hpp>
+// FIXME: clangd #include <mapbox/earcut.hpp>
+#include "../../include/mapbox/earcut.hpp"
 
 #include <array>
 #include <memory>

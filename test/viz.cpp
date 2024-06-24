@@ -7,7 +7,8 @@
 #pragma comment(lib, "legacy_stdio_definitions.lib")
 #endif
 
-#include <GLFW/glfw3.h>
+// FIXME: clangd #include <GLFW/glfw3.h>
+#include "../glfw/include/GLFW/glfw3.h"
 
 #include <cstdlib>
 #include <cmath>
